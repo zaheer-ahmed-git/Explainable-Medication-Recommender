@@ -1,501 +1,100 @@
 # Explainable Conversational Medication Recommender
 
-Research foundation for a clinician-facing medication recommendation system
-that combines conversational clinical understanding, hybrid
-Transformer-GNN ranking, and grounded explanations.
+Research software for a clinician-facing medication recommender that combines
+conversational clinical understanding, hybrid Transformer-GNN ranking, and
+grounded explanations.
 
-The central research question is:
+> Research question: how can a medical conversational recommender produce
+> medication rankings that are accurate, faithful, grounded, and clinically
+> understandable?
 
-> How can a medical conversational recommender generate medication rankings
-> that are accurate, faithful, grounded, and clinically understandable?
+This is research software. It is not a medical device, does not prescribe
+medication, and must not replace professional clinical judgment.
 
-This repository is research software. It is not a medical device, does not
-prescribe medication, and must not replace professional clinical judgment.
+## Status
 
-## Current Status
+- Data foundation and experimental models are implemented. Protected-data
+  results are summarised in [CHANGELOG.md](CHANGELOG.md) and the reports
+  listed in the documentation below.
+- The paired-OOF late-fusion gate passed on aggregate evaluation. This does
+  not authorise clinical use.
+- Explainability: a CPU numerical core (fused pairwise margins, bounded grouped
+  attribution) is implemented with synthetic tests. Clinical input adapters and
+  graph interventions are still planned. See the
+  [explainability plan](Documentation/ResearchFinal/ExplainabilityImplementationPlan.md).
 
-The repository is in the data-foundation and experimental-model implementation
-stage. The software is research-only. Protected Phase D ranking branches and
-the paired-OOF late-fusion gate have completed aggregate evaluation; they do
-not authorize clinical use.
+## Architecture
 
-- The research objective and target architecture are documented.
-- Explainability development has started with a CPU numerical core for fused
-  pairwise margins, direct/normalization routes, and bounded grouped attribution.
-  Synthetic tests cover the core; clinical input adapters, graph interventions,
-  replay and rank-reversal search remain planned. See the
-  [explainability implementation plan](Documentation/ResearchFinal/ExplainabilityImplementationPlan.md).
-- Licensed MIMIC-IV v3.1, MIMIC-IV-Note v2.2, and eICU-CRD v2.0 data are
-  on Calculco protected storage (`$DATASET_ROOT`); the ignored `Dataset/`
-  path is the default when data is colocated with the checkout.
-- A previous synthetic preprocessing and ranking prototype is retained in the
-  ignored `DepreciatedCode/` directory for reference.
-- Python dependencies for analysis, DuckDB processing, baseline modeling, and
-  testing are declared in `pyproject.toml`.
-- The active `pipeline/` currently includes source-inventory helpers and adult
-  ICU/unit-stay cohort materialization for MIMIC-IV and eICU, plus
-  aggregate-only source-table quality profiling, EDA briefing synthesis,
-  report-gated source extraction CLIs, and Milestone 5 harmonization for
-  cohort stays, demographics, conditions, medications, labs, vitals,
-  allergies, interventions, and temporal events. Milestone 6 temporal feature,
-  split, candidate-catalog, observed-label, and train-fitted preprocessing
-  artifact builders are also implemented. The Phase 8 P0 ImplementationPlan Step 9
-  package now adds a model-ready cohort, consistent input-derived provenance,
-  train-fit patient subgraphs and vocabularies, a schema-only data dictionary,
-  and explicit eICU coverage/evaluability gates. Its protected-data package is
-  complete. Milestone 7 baseline evaluation is implemented for aggregate
-  coverage, deterministic random, global-popularity, condition-popularity,
-  linear, and XGBoost baselines; validation winner frozen as `xgboost` and
-  final-mode held-out MIMIC test metrics are recorded in
-  `reports/milestone7_baseline_evaluation.json`. Milestone 8 graph-readiness
-  tooling is implemented and the protected-data graph gate passed for
-  graph-ablation readiness. Milestone 8B graph-aware ablation tooling is
-  implemented for graph-only XGBoost, graph-augmented XGBoost, late fusion, and
-  simple ensemble comparisons against the frozen XGBoost reference. The
-  protected Phase 8 P0 Milestone 8B run failed the required +0.005 NDCG@10
-  lift, so frozen XGBoost remained the Milestone 8B reference. Gate-first
-  Stage 1 structured recovery then cleared that bar: frozen selection
-  `xgboost_rank_ndcg_oof_late_fusion` (validation NDCG@10 ≈ `0.394607`) with
-  `neural_training_authorized=true`. The Stage 2 neural Transformer
-  patient/context training pipeline is implemented in `pipeline.neural_training`
-  (DuckDB cache preparation, PyTorch Transformer recommender, listwise training
-  with early stopping and temperature calibration, canonical-schema scoring,
-  and a validation gate/selection report against the Stage 1 winner). PyTorch
-  is an optional `neural` dependency group and is not synced by default; every
-  stage stays fail-closed behind the structured recovery gate and contract
-  lock. Protected development runs completed for v1/v2 and failed the neural
-  gate (v2 NDCG@10 ≈ `0.3955`, short of +0.005 and the MRR guard); v3 adds
-  Stage-1-matched graph tabular side features, stronger regularization, and
-  MRR-oriented primary-positive loss. The Phase D relation branch and frozen-
-  Transformer fusion workflow are now implemented in
-  `pipeline.gnn_training`: fold-excluded graph preparation, a native
-  PyTorch R-GCN-style ranker, six pre-registered representation/relation controls,
-  full-train refit, canonical standalone scoring, late/residual fusion, and
-  fail-closed development/final gates. Protected training and development
-  scoring completed: the standalone GNN qualified for its graph-model track.
-  The first asymmetric late-fusion run improved Transformer validation NDCG@10
-  by about `+0.00484` but missed the pre-registered `+0.005` hybrid bar
-  (`reports/phase8_p0_fusion_training_selection.json` remains historical
-  `hybrid_qualified=false`). The versioned paired-OOF late-fusion protocol
-  (`phase8-p0-paired-oof-late-fusion-v2`) then replaced that asymmetric
-  evidence: five fold-isolated Transformer OOF folds, six GNN-variant OOF
-  materializations, joint selection of GNN variant `full` and alpha `0.25` on
-  paired train OOF (NDCG@10 lift about `+0.0092` over the best single branch),
-  a three-epoch full GNN refit, and a one-shot MIMIC-test gate
-  (`mimiciv-test-paired-oof-v1`). That gate passed with NDCG@10 lift about
-  `+0.0131` vs the frozen Transformer, MRR@10 and Hit@10 also improved, and
-  `final_scoring_authorized=true` in
-  `reports/phase8_p0_paired_oof_late_fusion_gate_score.json`. Ranking
-  promotion does not imply better probability calibration: the ranking-gate
-  Brier score and 10-bin ECE disclose uncalibrated scores (hybrid higher than
-  the Transformer on those raw figures). A separate paired-OOF calibration
-  stage (`phase8-p0-paired-oof-calibration-v1`) completed on OAR `22662`: both
-  branches froze affine sigmoid on paired train OOF (cross-fitted Brier ≈ 0.069,
-  ECE ≈ 0.001) while preserving the frozen ranking score. Applying that mapping
-  to the consumed MIMIC-test gate would be retrospective only.
-  Disclosure: MIMIC test was previously scored for the frozen Transformer
-  elsewhere in Phase 8. See `Documentation/PairedOOFLateFusionProtocol.md`
-  and `Documentation/HybridModelResultReview.md`.
-  The versioned P1 representation is implemented in code: an explicit stay
-  query node, fold-safe numeric value/deviation/trend/recency features, time-bin
-  embeddings, learned relation gates/dropout, a rank-only baseline, dense
-  lab/vital ablations, compact one-fragment cache partitions, array-addressable
-  fold training, and OOF temperature fitting. Existing protected P0 caches are
-  incompatible with this layout and must be rebuilt before training.
-- Focused synthetic tests cover the current source-inventory, cohort,
-  profiling, EDA-summary, extraction, and Milestone 5 harmonization contracts.
-  Additional synthetic tests cover Milestone 6 temporal cutoffs, censoring,
-  split integrity, train-only candidates, weak observational labels, and the
-  initial Milestone 7 baseline metrics/reporting scaffold, including learned
-  linear and XGBoost baselines. Milestone 8 synthetic tests cover train-only
-  graph fitting, cold-start reporting, sparse graphs, and report safety.
-  Milestone 8B synthetic tests cover graph-feature joins, final-mode gating,
-  cold-start flags, fusion, eICU coverage-only behavior, and report safety.
-  Phase 8 P0 package tests additionally cover model-ready cohort timing,
-  provenance inference, train-only subgraphs, cold candidates, local
-  vocabularies, and schema-only reports. Stage 2 neural tests cover DuckDB cache
-  preparation, ranking metrics, shard assembly and collation, the Transformer
-  forward pass and losses, the fail-closed preflight/gate, and an end-to-end
-  prepare/train/score smoke test (PyTorch-dependent tests skip when the optional
-  `neural` group is not installed). Phase D GNN tests cover
-  contract/hash drift, patient-fold graph exclusion, temporal cutoffs,
-  bounded graph loading and graph-size batching, production-shape relation
-  aggregation, exact-hash single-pass verification, restart boundaries,
-  model/fusion behavior, canonical scoring, final-run claims, and an
-  end-to-end synthetic workflow. Paired-OOF tests also cover calibration
-  monotonicity, patient-fold isolation, branch-specific mapping selection,
-  immutable model/OOF provenance, and aggregate-only reporting.
+The target system has four layers:
 
-Do not interpret the poster's illustrative medication table or planned system
-diagram as a clinically validated implementation.
-
-## Target System
-
-The proposed system has four cooperating layers:
-
-1. **Conversational understanding:** an LLM extracts a structured patient
-   profile from clinical dialogue, notes, and structured EHR fields.
+1. **Conversational understanding:** an LLM extracts a structured patient profile.
 2. **Hybrid recommendation:** a Transformer models patient-context and temporal
-   interactions while a heterogeneous GNN models patient, diagnosis,
-   medication, laboratory, and knowledge relations.
-3. **Grounded explainability:** local attribution, graph evidence, clinical
-   rules, uncertainty, and provenance are assembled before an LLM verbalizes
-   the evidence.
-4. **Clinician review:** ranked medication candidates are presented with
-   rationale, warnings, uncertainty, and an audit trail.
+   interactions; a heterogeneous GNN models patient, diagnosis, medication, and
+   lab relations.
+3. **Grounded explainability:** attribution, graph evidence, clinical rules,
+   uncertainty, and provenance are assembled before any text is generated.
+4. **Clinician review:** ranked candidates with rationale, warnings, and an
+   audit trail.
 
-Recommendation generation and explanation generation remain separate so that
-the explanation is tied to actual model evidence instead of a plausible
-free-form narrative.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for boundaries.
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for boundaries and
-[Documentation/DataFoundationRoadmap.md](Documentation/DataFoundationRoadmap.md)
-for the implementation sequence.
+## Data
 
-## Data Strategy
+- MIMIC-IV v3.1 (development), MIMIC-IV-Note v2.2 (text), eICU-CRD v2.0 (external validation).
+- Raw PhysioNet data is licensed and is never committed or redistributed.
+- Data lives on protected storage, referenced by `DATASET_ROOT`.
 
-The project uses:
+## Repository guide
 
-- **MIMIC-IV v3.1** for deep single-center hospital and ICU development data.
-- **MIMIC-IV-Note v2.2** for de-identified discharge and radiology text.
-- **eICU-CRD v2.0** for multi-center ICU data and external validation.
+| Path | Contents |
+|---|---|
+| `pipeline/` | Cohort, extraction, harmonisation, features, baselines, graph and neural training code |
+| `scripts/calculco/` | OAR job submission scripts |
+| `tests/` | Synthetic-fixture tests |
+| `visualization/` | Aggregate-only figure-pack generator |
+| `Documentation/` | Research framing, milestones, and protocols (see below) |
+| `ARCHITECTURE.md`, `CHANGELOG.md` | System design and change history |
+| `FinalPosterCDS.pdf` | Research poster |
 
-The preferred evaluation design is development on MIMIC-IV and external
-validation on eICU after careful schema and vocabulary harmonization. Pooled
-training is optional and must not be attempted until concept coverage, units,
-cohort definitions, and label semantics are demonstrably compatible.
+Key documents:
+- [ResearchDetail.md](Documentation/ResearchDetail.md): research framing.
+- [DataFoundationRoadmap.md](Documentation/DataFoundationRoadmap.md): implementation sequence.
+- [Milestone8B.md](Documentation/Milestone8B.md): graph-aware ablation contract.
+- [PairedOOFLateFusionProtocol.md](Documentation/PairedOOFLateFusionProtocol.md): paired five-fold evidence and gate.
+- [HybridModelResultReview.md](Documentation/HybridModelResultReview.md): ranking and calibration comparison.
+- [ConditionNormalization.md](Documentation/ConditionNormalization.md): condition contract.
+- [CalculcoStudentGuide.md](Documentation/CalculcoStudentGuide.md): cluster access and job submission.
 
-Raw PhysioNet data is licensed and must never be committed or redistributed.
+## Setup
 
-## Planned Data Product
-
-The main modeling artifact is a candidate-ranking table with one row per:
-
-```text
-patient/stay + condition + candidate medication
-```
-
-Each row should include a prescription label, pre-decision patient context,
-source and cohort provenance, a deterministic patient-level split, and explicit
-temporal boundaries. Observed prescribing is a historical label, not proof that
-a medication is clinically optimal.
-
-## Repository Guide
-
-- `Documentation/ResearchDetail.md`: current research framing and contribution.
-- `Documentation/DataFoundationRoadmap.md`: phased implementation plan.
-- `Documentation/PosterPresentationGuide.md`: poster explanation and Q&A.
-- `Documentation/Milestone6FeatureLabelDictionary.md`: feature and label
-  artifact schemas, temporal contract, and observational-label caveats.
-- `Documentation/Milestone8.md`: graph-readiness contract, reports, and gates.
-- `Documentation/Milestone8B.md`: graph-aware ablation contract, reports, and
-  final-mode gate.
-- `Documentation/HybridModelFeatureStrategy.md`: planned Transformer/GNN
-  feature boundaries and selection gates (post-8B; not neural training yet).
-- `Documentation/PhaseDRankingModelsExplained.md`: Transformer, standalone
-  GNN, and late-fusion inputs/outputs; asymmetric vs paired-OOF hybrid gates.
-- `Documentation/PairedOOFLateFusionProtocol.md`: paired five-fold evidence,
-  joint GNN/alpha selection, OAR execution, one-shot gate contract, and
-  protected completion status.
-- `Documentation/HybridModelResultReview.md`: aggregate ranking and
-  calibration comparison for the paired late-fusion gate.
-- `visualization/`: aggregate-only Phase 4-9 meeting figure-pack generator.
-- `Documentation/SimilarPapers.md`: related-work notes.
-- `FinalPosterCDS.pdf`: research poster.
-- `ARCHITECTURE.md`: system and data architecture.
-- project notes: repeatable development and research workflows.
-- project notes: verification strategy.
-- project notes: review checklist.
-- project notes: durable instructions for coding agents.
-- project notes: reusable repository workflows.
-
-Local-only directories:
-
-- `Dataset/`: licensed source data and generated data artifacts.
-- `DepreciatedCode/`: synthetic prototype and historical artifacts.
-
-## Environment
-
-Development runs on **ULCO Calculco**. Machine-specific paths are gitignored;
-export `PROJECT_HOME`, `DATASET_ROOT`, and `WORK_SCRATCH` before pipeline
-commands.
-
-See [Documentation/Environment.md](Documentation/Environment.md) for path
-variables, gitignored files, and agent rules. Calculco platform notes:
-[Documentation/CalculcoSetup.md](Documentation/CalculcoSetup.md). Student
-onboarding (SSH, disks, CPU and GPU jobs):
-[Documentation/CalculcoStudentGuide.md](Documentation/CalculcoStudentGuide.md).
-
-This project uses Python 3.13 and `uv` exclusively.
-
-### Path overrides
-
-On Calculco (code in home, data on protected NFS), use **gitignored**
-per-machine files — not committed paths:
-
-```bash
-cp .env.example .env.calculco
-# edit exports, then: set -a && source .env.calculco && set +a
-```
-
-Variables: `PROJECT_HOME`, `DATASET_ROOT`, `DATA_PROTECTED`, `REPORTS_ROOT`,
-`WORK_SCRATCH`. `pipeline/config.py` reads them when set.
-
-### Setup and verification (lightweight)
-
-Run on the Calculco login node for routine development:
+Development runs on the ULCO Calculco cluster. Python 3.13 with `uv` only.
 
 ```bash
 uv sync
 uv run ruff check .
-```
-
-```bash
 uv run pytest
 ```
 
-### Pipeline CLIs (protected data required)
+Machine-specific paths go in a gitignored `.env.calculco` (copy from
+`.env.example`). Variables: `PROJECT_HOME`, `DATASET_ROOT`, `DATA_PROTECTED`,
+`REPORTS_ROOT`, `WORK_SCRATCH`.
 
-The commands below read licensed data via `DATASET_ROOT`. They are bounded but
-can be expensive on large tables. Run interactively only for small scopes; submit
-full cohort-filtered extraction via OAR (`scripts/calculco/` and
-project notes).
-
-Generate the metadata-only source inventory with:
-
-```bash
-uv run python -m pipeline.source_inventory
-```
-
-Build local ignored adult ICU/unit-stay cohort artifacts with:
+Pipeline commands read protected data. Run small scopes interactively and submit
+full runs through OAR (`scripts/calculco/`). Examples:
 
 ```bash
 uv run python -m pipeline.cohort
-```
-
-Build the aggregate-only source quality profile with:
-
-```bash
-uv run python -m pipeline.profile_tables
-```
-
-Build the aggregate EDA summary, stakeholder brief, and figure pack with:
-
-```bash
-uv run python -m pipeline.eda_summary
-```
-
-Build the aggregate Phase 4-9 meeting visualization pack with:
-
-```bash
-uv run python -m visualization.phase4_to_9
-```
-
-The generated meeting pack is written under ignored `visualization/figures/`
-plus `visualization/meeting_figure_pack.md` and
-`visualization/meeting_figure_pack.json`. It reads aggregate report manifests
-only and does not inspect raw clinical rows.
-
-Check source-file integrity for profiling-blocked files with:
-
-```bash
-uv run python -m pipeline.source_integrity
-```
-
-Run a manifest-wide integrity audit across MIMIC-IV, MIMIC-IV-Note, and eICU
-with:
-
-```bash
-uv run python -m pipeline.source_integrity --all-manifest-files
-```
-
-Build cohort-filtered local extracts after cohort, quality-profile, and
-source-integrity gates are available:
-
-```bash
-uv run python -m pipeline.mimic_extract
-uv run python -m pipeline.eicu_extract
-```
-
-Build the Milestone 5 harmonized cohort-stay, demographics, condition,
-medication, lab, vital, allergy, intervention, and temporal-event artifacts
-after extracts and local RxNorm/ATC mapping files are available under
-`Dataset/mappings/medications/`. Conditions additionally gain optional shared
-roll-up tokens (CCSR/CCS/GEM/chapter/structural category, curated eICU text, and
-project groups such as sepsis) from optional files under
-`Dataset/mappings/conditions/`; missing files degrade gracefully. Fetch the
-authoritative CCSR/CCS/GEM reference files (and a derived ICD chapter table)
-with `uv run python scripts/fetch_condition_reference_files.py` (needs network),
-and inventory diagnosis concepts / emit review-ready templates for the
-curation-only files with `uv run python scripts/build_condition_mappings.py`,
-then run:
-
-```bash
 uv run python -m pipeline.harmonize
-```
-
-Large lab/vital harmonization is split into smaller source-query/hash batches
-before final combination. On Calculco, tune this with
-`--domain-materialization-batches` or the OAR `HARMONIZE_DOMAIN_BATCHES`
-environment variable when DuckDB reports out-of-memory errors.
-
-The harmonization reports are aggregate-only:
-`reports/harmonization_manifest.json`,
-`reports/harmonization_coverage.json`, `reports/unmapped_concepts.json`,
-`reports/condition_normalization_coverage.json`, and
-`reports/eicu_diagnosis_text_mapping_review.csv`. See
-`Documentation/ConditionNormalization.md` for the frozen condition contract.
-
-Build Milestone 6 temporal feature artifacts and the observed-label ranking
-table after harmonization coverage and mapping gates are reviewed:
-
-```bash
-uv run python -m pipeline.features
-uv run python -m pipeline.build_training_table
-uv run python -m pipeline.preprocessing
-```
-
-These write patient-level local artifacts under
-`Dataset/processed/features/` and `Dataset/processed/training/`; aggregate-only
-manifests are `reports/milestone6_feature_manifest.json` and
-`reports/training_table_manifest.json`, plus
-`reports/preprocessing_manifest.json` for train-fitted imputation, scaling,
-encoding, and categorical vocabulary metadata. See
-`Documentation/Milestone6FeatureLabelDictionary.md`. For large protected-data
-runs, `patient_stay_features` and `event_sequences` are stay-hash-batched; tune
-with `--stay-feature-batches` / `STAY_FEATURE_BATCHES` and
-`--event-sequence-batches` / `EVENT_SEQUENCE_BATCHES`.
-
-To build the optional Phase 8 P0 feature-ablation stack without touching the
-default roots:
-
-```bash
-uv run python -m pipeline.features --feature-set phase8_p0 \
-  --features-root "$DATASET_ROOT/processed/phase8_p0/features" \
-  --manifest "$PROJECT_HOME/reports/phase8_p0_milestone6_feature_manifest.json"
-```
-
-The full isolated sequence is documented in project notes.
-
-Evaluate Milestone 7 coverage and transparent baselines after the Milestone 6
-manifests are reviewed:
-
-```bash
 uv run python -m pipeline.evaluate_baselines
-uv run python -m pipeline.evaluate_baselines --baseline linear --baseline xgboost
 ```
 
-Development mode writes aggregate-only reports
-`reports/milestone7_coverage_report.json` and
-`reports/milestone7_baseline_evaluation.json`, with local row-level scores and
-learned model artifacts under ignored
-`Dataset/processed/evaluation/milestone7/`. Held-out test metrics are blocked unless final mode is explicit:
-
-```bash
-scripts/calculco/submit_evaluate_baselines.sh final
-```
-
-Build Milestone 8 graph-readiness artifacts after Milestone 6 artifacts and
-Milestone 7 frozen selection are available:
-
-```bash
-uv run python -m pipeline.graph_suitability
-```
-
-This writes concept-level local graph artifacts under ignored
-`Dataset/processed/graph/milestone8/` and aggregate-only reports
-`reports/milestone8_graph_schema.json`,
-`reports/milestone8_graph_suitability.json`, and
-`reports/milestone8_ablation_plan.json`. It does not train the Transformer-GNN
-model or make clinical recommendation claims.
-
-Run Milestone 8B graph-aware ablations only after Milestone 7 final evaluation
-and the Milestone 8 graph gate have passed:
-
-```bash
-uv run python -m pipeline.graph_ablation
-```
-
-For protected-data scale, submit the development run through OAR, then run final
-mode only after `reports/milestone8b_frozen_selection.json` exists:
-
-```bash
-scripts/calculco/submit_graph_ablation.sh development
-scripts/calculco/submit_graph_ablation.sh final
-```
-
-Milestone 8B writes local row-level scores and model artifacts under ignored
-`Dataset/processed/evaluation/milestone8b/` and aggregate-only reports
-`reports/milestone8b_graph_feature_manifest.json`,
-`reports/milestone8b_ablation_evaluation.json`, and
-`reports/milestone8b_frozen_selection.json`. It is a graph-aware ablation gate,
-not validated clinical recommendation behavior or full Transformer-GNN training.
-
-Audit and attempt rank-aware Stage 1 recovery on the Phase 8 P0 package with:
-
-```bash
-scripts/calculco/submit_phase8_p0_gate_recovery.sh development
-```
-
-This CPU-only OAR path first creates or verifies
-`reports/phase8_p0_training_contract_lock.json`, performs all feature and
-fusion selection on patient-grouped MIMIC-train folds, and evaluates one locked
-candidate on validation. Final MIMIC test mode is blocked unless the recovery
-selection clears the gate. The command is documented here but no job is
-submitted automatically.
-
-Run the Stage 2 neural Transformer branch when the structured recovery
-selection records `neural_training_authorized` (Stage 1 development has
-already frozen that authorization). The neural gate must clear +0.005
-NDCG@10 over the Stage 1 winner (`xgboost_rank_ndcg_oof_late_fusion`), not
-the older Milestone 8B XGBoost anchor. PyTorch is optional and not synced by
-default, so install the `neural` group on the worker first:
+PyTorch is an optional dependency group. Install it only for the neural branch:
 
 ```bash
 uv sync --group neural
-uv run python -m pipeline.neural_training prepare
-uv run python -m pipeline.neural_training train
-uv run python -m pipeline.neural_training score
 ```
 
-`prepare` builds train-fit vocabularies, numeric normalization, and memory-
-bounded sharded DuckDB caches under ignored `Dataset/processed/phase8_p0/neural/`;
-`train` runs the listwise + auxiliary training loop with early stopping,
-checkpointing, and temperature calibration; `score` writes canonical scores plus
-aggregate-only reports
-`reports/phase8_p0_neural_prepare_manifest.json`,
-`reports/phase8_p0_neural_training_evaluation.json`,
-`reports/phase8_p0_neural_score_evaluation.json`, and
-`reports/phase8_p0_neural_training_selection.json`. For protected-data scale,
-submit the GPU OAR wrapper `scripts/calculco/phase8_p0_neural_training.sh` (see
-project notes). Every stage stays fail-closed behind the recovery gate.
+## License
 
-Do not use `pip`, Poetry, Conda, global Python, or system site-packages.
-
-## Working Principles
-
-- Plan before risky or multi-file changes.
-- Use bounded DuckDB queries or chunked readers for large compressed tables.
-- Split by patient and apply temporal cutoffs before modeling.
-- Keep source-specific extraction separate from harmonization.
-- Log cohort, feature, label, split, and model provenance.
-- Use synthetic fixtures in tests.
-- Review the diff, verification results, data-safety implications, and research
-  claims before merging.
-
-## Research References
-
-The project direction and related-work notes are maintained in
-`Documentation/ResearchDetail.md` and `Documentation/SimilarPapers.md`.
-Dataset users must also cite the official MIMIC-IV, MIMIC-IV-Note, and eICU-CRD
-publications and comply with their PhysioNet data-use agreements.
-
-## Security and Contributions
-
-Read [project notes](project notes) before handling clinical data or reporting a
-vulnerability. Contribution expectations are in
-[project notes](project notes).
-
-No open-source license has been selected for this repository. Unless a license
-is added by the maintainers, no permission to reuse or redistribute the code is
-granted.
+Proprietary. All rights reserved. See [LICENSE](LICENSE). No permission to reuse
+or redistribute the code is granted without written consent.
