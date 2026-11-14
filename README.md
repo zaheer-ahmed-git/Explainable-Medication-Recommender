@@ -14,8 +14,7 @@ medication, and must not replace professional clinical judgment.
 ## Status
 
 - Data foundation and experimental models are implemented. Protected-data
-  results are summarised in [CHANGELOG.md](CHANGELOG.md) and the reports
-  listed in the documentation below.
+  results are summarised in the reports listed in the documentation below.
 - The paired-OOF late-fusion gate passed on aggregate evaluation. This does
   not authorise clinical use.
 - Explainability: a CPU numerical core (fused pairwise margins, bounded grouped
@@ -36,8 +35,6 @@ The target system has four layers:
 4. **Clinician review:** ranked candidates with rationale, warnings, and an
    audit trail.
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for boundaries.
-
 ## Data
 
 - MIMIC-IV v3.1 (development), MIMIC-IV-Note v2.2 (text), eICU-CRD v2.0 (external validation).
@@ -53,7 +50,6 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for boundaries.
 | `tests/` | Synthetic-fixture tests |
 | `visualization/` | Aggregate-only figure-pack generator |
 | `Documentation/` | Research framing, milestones, and protocols (see below) |
-| `ARCHITECTURE.md`, `CHANGELOG.md` | System design and change history |
 | `FinalPosterCDS.pdf` | Research poster |
 
 Key documents:
